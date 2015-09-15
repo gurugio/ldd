@@ -72,22 +72,30 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 	
 	vma->vm_ops = &my_mem_vm_ops;
 
-	mmap_page = alloc_page(GFP_KERNEL);
+	mmap_page = alloc_pages(GFP_KERNEL, 4);
 	ptr_page = kmap_atomic(mmap_page);
-	for (i = 0; i < 20; i++)
+	for (i = 0; i < size; i++)
 		ptr_page[i] = i;
 	kunmap_atomic(ptr_page);
+
+	for (i = 0; i < 16; i++)
+		flush_dcache_page(mmap_page + i);
 
 	/* Remap-pfn-range will mark the range VM_IO */
 	if (remap_pfn_range(vma,
 			    vma->vm_start,
-			    page_to_pfn(mmap_page), //vma->vm_pgoff, // pfn
+			    page_to_pfn(mmap_page), /*vma->vm_pgoff,*/
 			    size,
 			    vma->vm_page_prot)) {
 		return -EAGAIN;
 	}
+	printk(KERN_NOTICE "map-size=%d\n", size);
 	
 	vma->vm_ops->open(vma);
+
+	/* for (i = 0; i < 1024; i++) */
+	/* 	alloc_page(GFP_KERNEL); */
+	
 	return 0;
 }
 
