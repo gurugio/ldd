@@ -53,11 +53,16 @@ int main(void)
 		printf("%x ", ptr[2][i]);
 	}
 	printf("\n");
+	printf("ptr-%p\n", ptr[2] + 4096);
+	for (i = 4096; i < 4096 + 10; i++) {
+		printf("%x ", ptr[2][i]);
+	}
+	printf("\n");
 
 
 	system("ps -eo vsz,rss,pid,comm | grep a.out");
 	system("cat /proc/meminfo | grep MemFree");
-	sprintf(command, "cat /proc/%d/maps", getpid());
+	sprintf(command, "cat /proc/%d/smaps", getpid());
 	system(command);
 
 	sleep(1);
