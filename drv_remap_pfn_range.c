@@ -61,6 +61,12 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 	printk(KERN_NOTICE "mmap:pgoff=%x size=%d pfn=%x\n",
 	       (int)vma->vm_pgoff, size, (int)page_to_pfn(mmap_page));
 
+	ptr_page = kmap_atomic(mmap_page);
+	for (i = 0; i < 100; i++)
+		ptr_page[i] = (char)vma->vm_pgoff;
+	kunmap_atomic(ptr_page);
+	SetPageDirty(mmap_page); /* only the first page */
+
 	/* Remap-pfn-range will mark the range VM_IO */
 	if (remap_pfn_range(vma,
 			    vma->vm_start,
@@ -69,13 +75,6 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 			    vma->vm_page_prot)) {
 		return -EAGAIN;
 	}
-	ptr_page = kmap_atomic(mmap_page);
-	for (i = 0; i < 100; i++)
-		ptr_page[i] = (char)vma->vm_pgoff;
-	kunmap_atomic(ptr_page);
-	SetPageDirty(mmap_page); /* only the first page */
-	flush_dcache_page(mmap_page);
-
 	vma->vm_ops = &my_mem_vm_ops;
 	vma->vm_ops->open(vma);
 	
