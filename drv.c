@@ -15,8 +15,6 @@ static int minor;
 static struct class *cl;
 static struct cdev my_cdev;
 
-struct page *mmap_page;
-
 
 void simple_vma_open(struct vm_area_struct *vma)
 {
@@ -26,24 +24,17 @@ void simple_vma_open(struct vm_area_struct *vma)
 
 void simple_vma_close(struct vm_area_struct *vma)
 {
-	printk(KERN_NOTICE "Simple VMA close\n");
+	printk(KERN_NOTICE "Simple VMA close, virt 0x%lx, phys 0x%lx\n",
+	       vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
 }
 
 static struct vm_operations_struct my_mem_vm_ops = {
 	.open = simple_vma_open,
 	.close = simple_vma_close,
-	.name = "MY_MEM",
 };
 
 static int open_mem(struct inode *inode, struct file *filp)
 {
-	/* if (dev->dev_info) */
-	/* 	filp->f_mapping->backing_dev_info = dev->dev_info; */
-
-	/* /\* Is /dev/mem or /dev/kmem ? *\/ */
-	/* if (dev->dev_info == &directly_mappable_cdev_bdi) */
-	/* 	filp->f_mode |= FMODE_UNSIGNED_OFFSET; */
-
 	printk("%s %d\n", __FUNCTION__, __LINE__);
 	return 0;
 }
@@ -63,38 +54,30 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 	size_t size = vma->vm_end - vma->vm_start;
 	char *ptr_page;
 	int i;
+	struct page *mmap_page;
 
-	vma->vm_page_prot = phys_mem_access_prot(file,
-						 vma->vm_pgoff,
-						 size,
-						 vma->vm_page_prot);
-	printk(KERN_NOTICE "vm_page_prot=%lx\n", (unsigned long)vma->vm_page_prot);
-	
-	vma->vm_ops = &my_mem_vm_ops;
+	mmap_page = alloc_pages(GFP_KERNEL, get_order(size));
 
-	mmap_page = alloc_pages(GFP_KERNEL, 4);
-	ptr_page = kmap_atomic(mmap_page);
-	for (i = 0; i < size; i++)
-		ptr_page[i] = i;
-	kunmap_atomic(ptr_page);
-
-	for (i = 0; i < 16; i++)
-		flush_dcache_page(mmap_page + i);
+	printk(KERN_NOTICE "mmap:pgoff=%x size=%d pfn=%x\n",
+	       (int)vma->vm_pgoff, size, (int)page_to_pfn(mmap_page));
 
 	/* Remap-pfn-range will mark the range VM_IO */
 	if (remap_pfn_range(vma,
 			    vma->vm_start,
-			    page_to_pfn(mmap_page), /*vma->vm_pgoff,*/
+			    page_to_pfn(mmap_page),
 			    size,
 			    vma->vm_page_prot)) {
 		return -EAGAIN;
 	}
-	printk(KERN_NOTICE "map-size=%d\n", size);
-	
-	vma->vm_ops->open(vma);
+	ptr_page = kmap_atomic(mmap_page);
+	for (i = 0; i < 100; i++)
+		ptr_page[i] = (char)vma->vm_pgoff;
+	kunmap_atomic(ptr_page);
+	SetPageDirty(mmap_page); /* only the first page */
+	flush_dcache_page(mmap_page);
 
-	/* for (i = 0; i < 1024; i++) */
-	/* 	alloc_page(GFP_KERNEL); */
+	vma->vm_ops = &my_mem_vm_ops;
+	vma->vm_ops->open(vma);
 	
 	return 0;
 }

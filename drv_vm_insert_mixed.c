@@ -21,14 +21,14 @@ struct page *data_pages[ALLOC_PAGE_COUNT];
 
 void simple_vma_open(struct vm_area_struct *vma)
 {
-	printk(KERN_NOTICE "Simple VMA open, virt 0x%lx, phys 0x%lx\n",
-	       vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+	printk(KERN_NOTICE "Simple VMA open, virt 0x%lx\n",
+	       vma->vm_start);
 }
 
 void simple_vma_close(struct vm_area_struct *vma)
 {
-	printk(KERN_NOTICE "Simple VMA close, virt 0x%lx, phys 0x%lx\n",
-	       vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+	printk(KERN_NOTICE "Simple VMA close, virt 0x%lx\n",
+	       vma->vm_start);
 }
 
 const char *simple_vma_name(struct vm_area_struct *vma)
