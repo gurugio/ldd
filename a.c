@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 char buf[1024];
 
@@ -10,8 +11,9 @@ int main(void)
 {
 	int fd;
 	int ret;
-	char *ptr;
+	char *ptr[3];
 	int i;
+	char command[128];
 
 	system("ps -eo vsz,rss,pid,comm | grep a.out");
 	system("cat /proc/meminfo | grep MemFree");
@@ -22,22 +24,46 @@ int main(void)
 		return 0;
 	}
 
-	ptr = mmap(NULL, 4096*16, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	ptr[0] = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if (ptr == MAP_FAILED) {
 		perror("mmap failed");
 	}
-
-	printf("ptr-%p\n", ptr);
-	for (i = 0; i < 30; i++) {
-		printf("%x ", ptr[i]);
+	printf("ptr-%p\n", ptr[0]);
+	for (i = 0; i < 10; i++) {
+		printf("%x ", ptr[0][i]);
 	}
 	printf("\n");
 
+	ptr[1] = mmap(NULL, 4096*2, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 4096*1);
+	if (ptr == MAP_FAILED) {
+		perror("mmap failed");
+	}
+	printf("ptr-%p\n", ptr[1]);
+	for (i = 0; i < 10; i++) {
+		printf("%x ", ptr[1][i]);
+	}
+	printf("\n");
+
+	ptr[2] = mmap(NULL, 4096*3, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 4096*3);
+	if (ptr == MAP_FAILED) {
+		perror("mmap failed");
+	}
+	printf("ptr-%p\n", ptr[2]);
+	for (i = 0; i < 10; i++) {
+		printf("%x ", ptr[2][i]);
+	}
+	printf("\n");
+
+
 	system("ps -eo vsz,rss,pid,comm | grep a.out");
 	system("cat /proc/meminfo | grep MemFree");
-	system("cat /proc/self/maps");
+	sprintf(command, "cat /proc/%d/maps", getpid());
+	system(command);
 
-	munmap(ptr, 4096*16);
+	sleep(1);
+	munmap(ptr[0], 4096);
+	munmap(ptr[1], 4096*2);
+	munmap(ptr[2], 4096*3);
 	close(fd);
 
 	return 0;
