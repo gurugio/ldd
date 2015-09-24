@@ -1,7 +1,7 @@
 ARCH=arm
-obj-m := drv.o
+obj-m := my_brd.o
 
-KERNELDIR := /home/giohkim/work/kernel/linux-lg115x
+KERNELDIR := /lib/modules/3.19.0-25-generic/build
 PWD := $(shell pwd)
 
 default :
