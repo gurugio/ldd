@@ -31,12 +31,20 @@ static struct radix_tree_root	my_brd_pages;
 static int my_brd_rw_page(struct block_device *bdev, sector_t sector,
 		       struct page *page, int rw)
 {
+	printk(KERN_EMERG "%s:%d\n", __FUNCTION__, __LINE__);
+	printk(KERN_EMERG "============================================\n");
+	dump_stack();
+	printk(KERN_EMERG "============================================\n\n\n");
 	return 0;
 }
 
 static int my_brd_ioctl(struct block_device *bdev, fmode_t mode,
 			unsigned int cmd, unsigned long arg)
 {
+	printk(KERN_EMERG "%s:%d\n", __FUNCTION__, __LINE__);
+	printk(KERN_EMERG "============================================\n");
+	dump_stack();
+	printk(KERN_EMERG "============================================\n\n\n");
 	return 0;
 }
 
@@ -76,8 +84,43 @@ static const struct block_device_operations my_brd_fops = {
 
 static void brd_make_request(struct request_queue *q, struct bio *bio)
 {
+	struct block_device *bdev = bio->bi_bdev;
+	struct brd_device *brd = bdev->bd_disk->private_data;
+	int rw;
+	struct bio_vec bvec;
+	sector_t sector;
+	struct bvec_iter iter;
+	int err = -EIO;
 
+	/* brd_make_request() is called 3-times before my_brd_init completes.
+	 * Where? Why? Why 3-times?
+	 */
 	printk(KERN_EMERG "brd_make_request: do nothing but bio_end()\n");
+	printk(KERN_EMERG "============================================\n");
+	dump_stack();
+	printk(KERN_EMERG "============================================\n\n\n");
+
+	printk(KERN_EMERG "sector=%d size=%d capa=%d rw=%d\n",
+	       (int)bio->bi_iter.bi_sector,
+	       (int)bio->bi_iter.bi_size,
+	       (int)get_capacity(my_brd_disk),
+	       (int)bio->bi_rw & REQ_DISCARD);
+	       
+#if 0
+	sector = bio->bi_iter.bi_sector;
+	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk))
+		goto out;
+
+	if (unlikely(bio->bi_rw & REQ_DISCARD)) {
+		err = 0;
+		discard_from_brd(brd, sector, bio->bi_iter.bi_size);
+		goto out;
+	}
+
+	rw = bio_rw(bio);
+	if (rw == READA)
+		rw = READ;
+#endif
 	bio_endio(bio, 0);
 
 }
@@ -142,6 +185,8 @@ static int __init my_brd_init(void)
 	set_capacity(my_brd_disk, SZ_16M / 512);
 
 	/* disk is shown in /sys/block??? */
+	/* add_disk() must be after all initializations.
+	 * It calls many methods of the disk including brd_make_request() */
 	add_disk(my_brd_disk);
 	printk(KERN_EMERG "add_disk ok\n");
 	

@@ -5,7 +5,7 @@ KERNELDIR := /lib/modules/3.19.0-25-generic/build
 PWD := $(shell pwd)
 
 default :
-	$(MAKE) -C $(KERNELDIR) SUBDIRS=$(PWD) EXTRA_CFLAGS="-I$(KERNELDIR)"
+	$(MAKE) -C $(KERNELDIR) SUBDIRS=$(PWD)
 
 clean:
 	rm -rf *.ko
