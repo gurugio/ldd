@@ -76,14 +76,32 @@ static const struct block_device_operations my_brd_fops = {
 
 static void brd_make_request(struct request_queue *q, struct bio *bio)
 {
+
+	printk(KERN_EMERG "brd_make_request: do nothing but bio_end()\n");
+	bio_endio(bio, 0);
+
+}
+
+static struct kobject *brd_probe(dev_t dev, int *part, void *data)
+{
+	struct kobject *kobj;
+
+	printk(KERN_EMERG "brd_probe start\n");
+	kobj = get_disk(my_brd_disk);
+	*part = 0;
+
+	printk(KERN_EMERG "brd_probe ends\n");
+	return kobj;
 }
 
 static int __init my_brd_init(void)
 {
+	printk(KERN_EMERG "start my_brd_init\n");
 	major = register_blkdev(0, "my_brd_ramdisk");
 	if (major < 0)
 		goto out;
 
+	printk(KERN_EMERG "major=%d\n", major);
 	my_brd_number		= 0;
 	spin_lock_init(&my_brd_lock);
 	INIT_RADIX_TREE(&my_brd_pages, GFP_ATOMIC);
@@ -113,6 +131,7 @@ static int __init my_brd_init(void)
 	my_brd_disk = alloc_disk(1);
 	if (!my_brd_disk)
 		goto out_free_queue;
+	printk(KERN_EMERG "disk-alloc ok\n");
 	my_brd_disk->major		= major;
 	my_brd_disk->first_minor	= 0;
 	my_brd_disk->fops		= &my_brd_fops;
@@ -122,6 +141,15 @@ static int __init my_brd_init(void)
 	sprintf(my_brd_disk->disk_name, "my_brd%d", 0);
 	set_capacity(my_brd_disk, SZ_16M / 512);
 
+	/* disk is shown in /sys/block??? */
+	add_disk(my_brd_disk);
+	printk(KERN_EMERG "add_disk ok\n");
+	
+	blk_register_region(MKDEV(major, 0), 1UL,
+			    THIS_MODULE, brd_probe, NULL, NULL);
+	printk(KERN_EMERG "blk_register_region ok\n");
+
+	printk(KERN_EMERG "complete my_brd_init\n");
 	return 0;
 
 out_free_queue:
@@ -171,10 +199,16 @@ static void my_brd_free_pages(struct radix_tree_root *pages_tree)
 
 static void __exit my_brd_exit(void)
 {
-	put_disk(my_brd_disk);
+	del_gendisk(my_brd_disk); /* <-> alloc_disk */
+
+	put_disk(my_brd_disk);  /* <-> get_disk */
 	blk_cleanup_queue(my_brd_queue);
 	my_brd_free_pages(&my_brd_pages);
-	unregister_blkdev(major, "my_brd_ramdisk");
+
+	blk_unregister_region(MKDEV(major, 0), 1UL);
+	unregister_blkdev(RAMDISK_MAJOR, "my_brd_ramdisk");
+
+	printk(KERN_EMERG "complete my_brd_exit\n");
 }
 
 module_init(my_brd_init);
