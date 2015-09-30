@@ -15,6 +15,8 @@
 #include <linux/sizes.h>
 MODULE_LICENSE("GPL");
 
+#define SECTOR_SHIFT		9
+
 static int major;
 static int		my_brd_number;
 static struct request_queue	*my_brd_queue;
@@ -25,7 +27,9 @@ static struct gendisk		*my_brd_disk;
  * of the block device.
  */
 static spinlock_t		my_brd_lock;
-static struct radix_tree_root	my_brd_pages;
+
+#define DISK_PAGES (SZ_16M / 4096)
+static struct page *disk_image[DISK_PAGES];
 
 
 static int my_brd_rw_page(struct block_device *bdev, sector_t sector,
@@ -85,7 +89,7 @@ static const struct block_device_operations my_brd_fops = {
 static void brd_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
-	struct brd_device *brd = bdev->bd_disk->private_data;
+	/* struct brd_device *brd = bdev->bd_disk->private_data; */
 	int rw;
 	struct bio_vec bvec;
 	sector_t sector;
@@ -94,35 +98,82 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 
 	/* brd_make_request() is called 3-times before my_brd_init completes.
 	 * Where? Why? Why 3-times?
+	 * ARM-board: add_disk() calls blkdev_get()->rescan_partition()->...
+	 [  299.736026] CPU: 0 PID: 806 Comm: insmod Tainted: G        W  O  3.16.7+ #53
+	 [  299.743084] [<80014ec4>] (unwind_backtrace) from [<80011eb4>] (show_stack+0x10/0x14)
+	 [  299.750840] [<80011eb4>] (show_stack) from [<805cf094>] (dump_stack+0x80/0xc0)
+	 [  299.758072] [<805cf094>] (dump_stack) from [<7f0080f0>] (brd_make_request+0x2c/0x80 [my_brd])
+	 [  299.766606] [<7f0080f0>] (brd_make_request [my_brd]) from [<802a30f8>] (generic_make_request+0xa8/0xd4)
+	 [  299.776014] [<802a30f8>] (generic_make_request) from [<802a31a8>] (submit_bio+0x84/0x168)
+	 [  299.784186] [<802a31a8>] (submit_bio) from [<801443ac>] (_submit_bh+0x1a4/0x24c)
+	 [  299.791623] [<801443ac>] (_submit_bh) from [<80145b38>] (block_read_full_page+0x274/0x328)
+	 [  299.799894] [<80145b38>] (block_read_full_page) from [<800c5a34>] (do_read_cache_page+0x84/0x198)
+	 [  299.808772] [<800c5a34>] (do_read_cache_page) from [<800c5b60>] (read_cache_page+0x18/0x20)
+	 [  299.817129] [<800c5b60>] (read_cache_page) from [<802b3724>] (read_dev_sector+0x28/0x6c)
+	 [  299.825215] [<802b3724>] (read_dev_sector) from [<802b5068>] (read_lba+0xbc/0x160)
+	 [  299.832785] [<802b5068>] (read_lba) from [<802b542c>] (efi_partition+0xc8/0x8b8)
+	 [  299.840186] [<802b542c>] (efi_partition) from [<802b45a8>] (check_partition+0x140/0x1fc)
+	 [  299.848277] [<802b45a8>] (check_partition) from [<802b3c80>] (rescan_partitions+0x9c/0x2bc)
+	 [  299.856632] [<802b3c80>] (rescan_partitions) from [<80147ec4>] (__blkdev_get+0x2bc/0x3dc)
+	 [  299.864803] [<80147ec4>] (__blkdev_get) from [<80148188>] (blkdev_get+0x1a4/0x31c)
+	 [  299.872373] [<80148188>] (blkdev_get) from [<802b1a58>] (add_disk+0x330/0x42c)
+	 [  299.879602] [<802b1a58>] (add_disk) from [<7f00a14c>] (my_brd_init+0x14c/0x1c4 [my_brd])
+	 [  299.887695] [<7f00a14c>] (my_brd_init [my_brd]) from [<80008b84>] (do_one_initcall+0x8c/0x1c4)
+	 [  299.896311] [<80008b84>] (do_one_initcall) from [<800914cc>] (load_module+0x1b28/0x1f6c)
+	 [  299.904394] [<800914cc>] (load_module) from [<800919ec>] (SyS_init_module+0xdc/0xf0)
+	 [  299.912138] [<800919ec>] (SyS_init_module) from [<8000e560>] (ret_fast_syscall+0x0/0x30)
+	 [  299.920244] ============================================
+	 [  299.928516] sector=0 size=4096 capa=32768 rw=0
 	 */
 	printk(KERN_EMERG "brd_make_request: do nothing but bio_end()\n");
 	printk(KERN_EMERG "============================================\n");
 	dump_stack();
-	printk(KERN_EMERG "============================================\n\n\n");
+	printk(KERN_EMERG "============================================\n");
 
-	printk(KERN_EMERG "sector=%d size=%d capa=%d rw=%d\n",
+	printk(KERN_EMERG "bio-info:sector=%d size=%d capa=%d rw=%d\n",
 	       (int)bio->bi_iter.bi_sector,
 	       (int)bio->bi_iter.bi_size,
 	       (int)get_capacity(my_brd_disk),
-	       (int)bio->bi_rw & REQ_DISCARD);
+	       (int)(bio->bi_rw & REQ_DISCARD));
 	       
-#if 0
-	sector = bio->bi_iter.bi_sector;
-	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk))
-		goto out;
 
-	if (unlikely(bio->bi_rw & REQ_DISCARD)) {
-		err = 0;
-		discard_from_brd(brd, sector, bio->bi_iter.bi_size);
+	sector = bio->bi_iter.bi_sector;
+	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk)) {
+		printk(KERN_EMERG "sector overflow\n");
 		goto out;
 	}
 
 	rw = bio_rw(bio);
 	if (rw == READA)
 		rw = READ;
-#endif
-	bio_endio(bio, 0);
 
+	bio_for_each_segment(bvec, bio, iter) {
+		void *mem;
+		void *disk_ptr;
+		unsigned int len = bvec.bv_len;
+
+		printk(KERN_EMERG "sector=%x page-%x disk-page-%x len=%d offset=%x rw=%s\n",
+		       (int)sector,
+		       (int)page_to_pfn(bvec.bv_page),
+		       (int)page_to_pfn(disk_image[sector]),
+		       bvec.bv_len, bvec.bv_offset,
+		       rw == READ ? "READ":"WRITE");
+
+		mem = kmap_atomic(bvec.bv_page);
+		disk_ptr = kmap_atomic(disk_image[sector]);
+		if (rw == READ) {
+			memcpy(mem + bvec.bv_offset, disk_ptr + bvec.bv_offset, len);
+		} else {
+			memcpy(disk_ptr + bvec.bv_offset, mem + bvec.bv_offset, len);
+		}
+		kunmap_atomic(disk_ptr);
+		kunmap_atomic(mem);
+		sector += len >> SECTOR_SHIFT;
+	}
+
+	err = 0;
+out:
+	bio_endio(bio, err);
 }
 
 static struct kobject *brd_probe(dev_t dev, int *part, void *data)
@@ -139,6 +190,13 @@ static struct kobject *brd_probe(dev_t dev, int *part, void *data)
 
 static int __init my_brd_init(void)
 {
+	int i;
+
+	
+	for (i = 0; i < DISK_PAGES; i++)
+		disk_image[i] = alloc_page(GFP_KERNEL);
+	
+
 	printk(KERN_EMERG "start my_brd_init\n");
 	major = register_blkdev(0, "my_brd_ramdisk");
 	if (major < 0)
@@ -147,7 +205,6 @@ static int __init my_brd_init(void)
 	printk(KERN_EMERG "major=%d\n", major);
 	my_brd_number		= 0;
 	spin_lock_init(&my_brd_lock);
-	INIT_RADIX_TREE(&my_brd_pages, GFP_ATOMIC);
 
 	my_brd_queue = blk_alloc_queue(GFP_KERNEL);
 	if (!my_brd_queue)
@@ -195,6 +252,7 @@ static int __init my_brd_init(void)
 	printk(KERN_EMERG "blk_register_region ok\n");
 
 	printk(KERN_EMERG "complete my_brd_init\n");
+	
 	return 0;
 
 out_free_queue:
@@ -205,53 +263,19 @@ out:
 	return 0;
 }
 
-/*
- * Free all backing store pages and radix tree. This must only be called when
- * there are no other users of the device.
- */
-#define FREE_BATCH 16
-static void my_brd_free_pages(struct radix_tree_root *pages_tree)
-{
-	unsigned long pos = 0;
-	struct page *pages[FREE_BATCH];
-	int nr_pages;
-
-	do {
-		int i;
-
-		nr_pages = radix_tree_gang_lookup(pages_tree,
-				(void **)pages, pos, FREE_BATCH);
-
-		for (i = 0; i < nr_pages; i++) {
-			void *ret;
-
-			BUG_ON(pages[i]->index < pos);
-			pos = pages[i]->index;
-			ret = radix_tree_delete(pages_tree, pos);
-			BUG_ON(!ret || ret != pages[i]);
-			__free_page(pages[i]);
-		}
-
-		pos++;
-
-		/*
-		 * This assumes radix_tree_gang_lookup always returns as
-		 * many pages as possible. If the radix-tree code changes,
-		 * so will this have to.
-		 */
-	} while (nr_pages == FREE_BATCH);
-}
-
 static void __exit my_brd_exit(void)
 {
+	int i;
 	del_gendisk(my_brd_disk); /* <-> alloc_disk */
 
 	put_disk(my_brd_disk);  /* <-> get_disk */
 	blk_cleanup_queue(my_brd_queue);
-	my_brd_free_pages(&my_brd_pages);
 
 	blk_unregister_region(MKDEV(major, 0), 1UL);
-	unregister_blkdev(RAMDISK_MAJOR, "my_brd_ramdisk");
+	unregister_blkdev(major, "my_brd_ramdisk");
+
+	for (i = 0; i < DISK_PAGES; i++)
+		__free_page(disk_image[i]);
 
 	printk(KERN_EMERG "complete my_brd_exit\n");
 }
