@@ -28,7 +28,11 @@ static struct gendisk		*my_brd_disk;
  */
 static spinlock_t		my_brd_lock;
 
-#define DISK_PAGES (SZ_16M / 4096)
+#define PAGE_SECTORS_SHIFT	(PAGE_SHIFT - SECTOR_SHIFT)
+#define PAGE_SECTORS		(1 << PAGE_SECTORS_SHIFT)
+
+#define DISK_PAGES (SZ_32M / 4096)
+#define DISK_SECTORS (SZ_32M / 512)
 static struct page *disk_image[DISK_PAGES];
 
 
@@ -86,6 +90,11 @@ static const struct block_device_operations my_brd_fops = {
 };
 
 
+static struct page *brd_sector_to_page(int sector_num)
+{
+	return disk_image[sector_num >> PAGE_SECTORS_SHIFT];
+}
+
 static void brd_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
@@ -125,10 +134,10 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 	 [  299.920244] ============================================
 	 [  299.928516] sector=0 size=4096 capa=32768 rw=0
 	 */
-	printk(KERN_EMERG "brd_make_request: do nothing but bio_end()\n");
-	printk(KERN_EMERG "============================================\n");
-	dump_stack();
-	printk(KERN_EMERG "============================================\n");
+	/* printk(KERN_EMERG "brd_make_request: do nothing but bio_end()\n"); */
+	/* printk(KERN_EMERG "============================================\n"); */
+	/* dump_stack(); */
+	/* printk(KERN_EMERG "============================================\n"); */
 
 	printk(KERN_EMERG "bio-info:sector=%d size=%d capa=%d rw=%d\n",
 	       (int)bio->bi_iter.bi_sector,
@@ -138,11 +147,33 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 	       
 
 	sector = bio->bi_iter.bi_sector;
+
+	/* printk(KERN_EMERG "end_sector=%d capa=%d\n", */
+	/*        (int)bio_end_sector(bio), */
+	/*        (int)get_capacity(bdev->bd_disk)); */
 	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk)) {
 		printk(KERN_EMERG "sector overflow\n");
 		goto out;
 	}
 
+	/* rw == REQ_DISCARD == 0x80: discard sector */
+	/* REQ_DISCARD command is called when format */
+	/* BUGBUG: discarding size is multiple of page-size?? */
+	if (unlikely(bio->bi_rw & REQ_DISCARD)) {
+		int n = (int)bio->bi_iter.bi_size; /* length to clear */
+		err = 0;
+
+		while (n >= PAGE_SIZE) {
+			/* clear page */
+			/* page number == sector / 8 */
+			clear_highpage(brd_sector_to_page(sector));
+			/* sector=512-byte, page=4096-byte ===> sector += 8 */
+			sector += PAGE_SIZE >> SECTOR_SHIFT;
+			n -= PAGE_SIZE;
+		}
+		goto out;
+	}
+	
 	rw = bio_rw(bio);
 	if (rw == READA)
 		rw = READ;
@@ -151,20 +182,29 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 		void *mem;
 		void *disk_ptr;
 		unsigned int len = bvec.bv_len;
+		unsigned int offset = sector & (PAGE_SECTORS - 1) << SECTOR_SHIFT;
 
-		printk(KERN_EMERG "sector=%x page-%x disk-page-%x len=%d offset=%x rw=%s\n",
+		printk(KERN_EMERG "bvec:sector=%d page-%x disk-page-%x len=%d offset=%x rw=%s\n",
 		       (int)sector,
 		       (int)page_to_pfn(bvec.bv_page),
-		       (int)page_to_pfn(disk_image[sector]),
+		       (int)page_to_pfn(brd_sector_to_page(sector)),
 		       bvec.bv_len, bvec.bv_offset,
 		       rw == READ ? "READ":"WRITE");
 
+
+		/*
+		 * BUGBUG: len can be bigger than PAGE_SIZE.
+		 * It should check next page should be referenced.
+		 *
+		 * And is (disk_ptr + offset) correct?
+		 */
+		
 		mem = kmap_atomic(bvec.bv_page);
-		disk_ptr = kmap_atomic(disk_image[sector]);
+		disk_ptr = kmap_atomic(brd_sector_to_page(sector));
 		if (rw == READ) {
-			memcpy(mem + bvec.bv_offset, disk_ptr + bvec.bv_offset, len);
+			memcpy(mem + bvec.bv_offset, disk_ptr + offset, len);
 		} else {
-			memcpy(disk_ptr + bvec.bv_offset, mem + bvec.bv_offset, len);
+			memcpy(disk_ptr + offset, mem + bvec.bv_offset, len);
 		}
 		kunmap_atomic(disk_ptr);
 		kunmap_atomic(mem);
@@ -192,7 +232,7 @@ static int __init my_brd_init(void)
 {
 	int i;
 
-	
+	printk(KERN_EMERG "allocate %d-pages\n", DISK_PAGES);
 	for (i = 0; i < DISK_PAGES; i++)
 		disk_image[i] = alloc_page(GFP_KERNEL);
 	
@@ -239,7 +279,7 @@ static int __init my_brd_init(void)
 	my_brd_disk->queue		= my_brd_queue;
 	my_brd_disk->flags		= GENHD_FL_EXT_DEVT;
 	sprintf(my_brd_disk->disk_name, "my_brd%d", 0);
-	set_capacity(my_brd_disk, SZ_16M / 512);
+	set_capacity(my_brd_disk, DISK_SECTORS);
 
 	/* disk is shown in /sys/block??? */
 	/* add_disk() must be after all initializations.
