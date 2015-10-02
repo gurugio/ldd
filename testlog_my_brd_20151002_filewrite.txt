@@ -1,0 +1,114 @@
+
+# mount -t ext4 /dev/my_brd mnt
+[  933.131360] brd_probe start
+[  933.134154] brd_probe ends
+[  933.136893] brd_probe start
+[  933.139845] brd_probe ends
+[  933.142608] bio-info:sector=2 size=1024 capa=65536 rw=0
+[  933.147855] bvec:sector=2 page-fdd0 disk-page-4920b len=1024 offset=400 rw=READ
+[  933.155177] bio-info:sector=4 size=1024 capa=65536 rw=0
+[  933.160442] bvec:sector=4 page-fdd0 disk-page-4920b len=1024 offset=800 rw=READ
+[  933.167809] bio-info:sector=326 size=1024 capa=65536 rw=0
+[  933.173202] bvec:sector=326 page-fdd1 disk-page-4927e len=1024 offset=c00 rw=READ
+[  933.180689] bio-info:sector=324 size=1024 capa=65536 rw=0
+[  933.186091] bvec:sector=324 page-fdd1 disk-page-4927e len=1024 offset=800 rw=READ
+[  933.193615] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[  933.199195] bvec:sector=32770 page-fdd2 disk-page-48234 len=1024 offset=400 rw=READ
+[  933.207061] bio-info:sector=2 size=1024 capa=65536 rw=0
+[  933.212280] bvec:sector=2 page-fdd0 disk-page-4920b len=1024 offset=400 rw=WRITE
+[  933.219770] EXT4-fs (my_brd0): mounted filesystem with ordered data mode. Opts: (null)
+# cd mnt
+# touch aaa
+[  940.504529] bio-info:sector=268 size=1024 capa=65536 rw=0
+[  940.510017] bvec:sector=268 page-fdcf disk-page-491f9 len=1024 offset=800 rw=READ
+[  940.517559] bio-info:sector=292 size=1024 capa=65536 rw=0
+[  940.523131] bvec:sector=292 page-fdd3 disk-page-4927a len=1024 offset=800 rw=READ
+# [  946.175508] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[  946.181077] bvec:sector=32770 page-fdd2 disk-page-48234 len=1024 offset=400 rw=WRITE
+[  946.189025] bio-info:sector=32772 size=1024 capa=65536 rw=0
+[  946.194592] bvec:sector=32772 page-fdd2 disk-page-48234 len=1024 offset=800 rw=WRITE
+[  946.202375] bio-info:sector=32774 size=1024 capa=65536 rw=0
+[  946.207962] bvec:sector=32774 page-fdd3 disk-page-48234 len=1024 offset=800 rw=WRITE
+[  946.215719] bio-info:sector=32776 size=1024 capa=65536 rw=0
+[  946.221283] bvec:sector=32776 page-fdd0 disk-page-48235 len=1024 offset=800 rw=WRITE
+[  946.229039] bio-info:sector=32778 size=1024 capa=65536 rw=0
+[  946.234603] bvec:sector=32778 page-fdd1 disk-page-48235 len=1024 offset=c00 rw=WRITE
+[  946.242358] bio-info:sector=32780 size=1024 capa=65536 rw=0
+[  946.247931] bvec:sector=32780 page-fdd1 disk-page-48235 len=1024 offset=800 rw=WRITE
+[  946.255674] bio-info:sector=32782 size=1024 capa=65536 rw=0
+[  946.261241] bvec:sector=32782 page-fdcf disk-page-48235 len=1024 offset=800 rw=WRITE
+[  946.268984] bio-info:sector=32784 size=1024 capa=65536 rw=0
+[  946.274551] bvec:sector=32784 page-fdd0 disk-page-48236 len=1024 offset=400 rw=WRITE
+[  946.282319] bio-info:sector=32786 size=1024 capa=65536 rw=0
+[  946.287893] bvec:sector=32786 page-fd98 disk-page-48236 len=1024 offset=400 rw=WRITE
+cat > aaa
+abcd
+[  952.400037] bio-info:sector=260 size=1024 capa=65536 rw=0
+[  952.405434] bvec:sector=260 page-fdcb disk-page-491ea len=1024 offset=800 rw=READ
+[  952.412951] bio-info:sector=262 size=1024 capa=65536 rw=0
+[  952.418385] bvec:sector=262 page-fdcb disk-page-491ea len=1024 offset=c00 rw=READ
+[  952.425945] bio-info:sector=17410 size=1024 capa=65536 rw=0
+[  952.431511] bvec:sector=17410 page-fdd8 disk-page-48ab4 len=1024 offset=0 rw=WRITE
+# cat [  954.175550] bio-info:sector=32788 size=1024 capa=65536 rw=0
+[  954.181118] bvec:sector=32788 page-fd98 disk-page-48236 len=1024 offset=800 rw=WRITE
+[  954.188995] bio-info:sector=32790 size=1024 capa=65536 rw=0
+[  954.194647] bvec:sector=32790 page-fdd0 disk-page-48236 len=1024 offset=400 rw=WRITE
+[  954.202409] bio-info:sector=32792 size=1024 capa=65536 rw=0
+[  954.207993] bvec:sector=32792 page-fdd1 disk-page-48237 len=1024 offset=c00 rw=WRITE
+[  954.215748] bio-info:sector=32794 size=1024 capa=65536 rw=0
+[  954.221312] bvec:sector=32794 page-fdcb disk-page-48237 len=1024 offset=c00 rw=WRITE
+[  954.229067] bio-info:sector=32796 size=1024 capa=65536 rw=0
+[  954.234631] bvec:sector=32796 page-fdd0 disk-page-48237 len=1024 offset=800 rw=WRITE
+[  954.242411] bio-info:sector=32798 size=1024 capa=65536 rw=0
+a[  954.248036] bvec:sector=32798 page-fd1e disk-page-48237 len=1024 offset=c00 rw=WRITE
+aa
+abcd
+# cd ..
+# umop[  961.175542] bio-info:sector=32800 size=1024 capa=65536 rw=0
+[  961.181113] bvec:sector=32800 page-fd90 disk-page-48238 len=1024 offset=0 rw=WRITE
+[  961.188700] bio-info:sector=32802 size=1024 capa=65536 rw=0
+[  961.194265] bvec:sector=32802 page-fdd1 disk-page-48238 len=1024 offset=c00 rw=WRITE
+[  961.202027] bio-info:sector=32804 size=1024 capa=65536 rw=0
+[  961.207605] bvec:sector=32804 page-fd90 disk-page-48238 len=1024 offset=800 rw=WRITE                                                                     [  963.265511] bio-info:sector=2 size=1024 capa=65536 rw=0
+[  963.270730] bvec:sector=2 page-fdd0 disk-page-4920b len=1024 offset=400 rw=WRITE
+[  963.278152] bio-info:sector=4 size=1024 capa=65536 rw=0
+[  963.283370] bvec:sector=4 page-fdd0 disk-page-4920b len=1024 offset=800 rw=WRITE
+[  963.290796] bio-info:sector=262 size=1024 capa=65536 rw=0
+[  963.296187] bvec:sector=262 page-fdcb disk-page-491ea len=1024 offset=c00 rw=WRITE
+[  963.303766] bio-info:sector=268 size=1024 capa=65536 rw=0
+[  963.309165] bvec:sector=268 page-fdcf disk-page-491f9 len=1024 offset=800 rw=WRITE
+[  963.316732] bio-info:sector=292 size=1024 capa=65536 rw=0
+[  963.322131] bvec:sector=292 page-fdd3 disk-page-4927a len=1024 offset=800 rw=WRITE
+
+[  963.329705] bio-info:sector=324 size=1024 capa=65536 rw=0
+# [  963.335263] bvec:sector=324 page-fdd1 disk-page-4927e len=1024 offset=800 rw=WRITE
+[  963.343003] bio-info:sector=326 size=1024 capa=65536 rw=0
+[  963.348405] bvec:sector=326 page-fdd1 disk-page-4927e len=1024 offset=c00 rw=WRITE
+
+#
+# umount mnt
+[  966.738216] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[  966.743786] bvec:sector=32770 page-fdd2 disk-page-48234 len=1024 offset=400 rw=WRITE
+[  966.751553] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[  966.757144] bvec:sector=32770 page-fdd2 disk-page-48234 len=1024 offset=400 rw=WRITE
+[  966.764885] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[  966.770467] bvec:sector=32770 page-fdd2 disk-page-48234 len=1024 offset=400 rw=WRITE
+[  966.778225] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[  966.783789] bvec:sector=32770 page-fdd2 disk-page-48234 len=1024 offset=400 rw=WRITE
+[  966.791592] bio-info:sector=2 size=1024 capa=65536 rw=0
+[  966.796821] bvec:sector=2 page-fdd0 disk-page-4920b len=1024 offset=400 rw=WRITE
+[  966.804372] brd_probe start
+[  966.807230] brd_probe ends
+[  966.809938] my_brd_ioctl:52
+[  966.812723] ============================================
+[  966.818113] CPU: 1 PID: 807 Comm: umount Tainted: G           O  3.16.7+ #53
+[  966.825168] [<80014ec4>] (unwind_backtrace) from [<80011eb4>] (show_stack+0x10/0x14)
+[  966.832923] [<80011eb4>] (show_stack) from [<805cf094>] (dump_stack+0x80/0xc0)
+[  966.840152] [<805cf094>] (dump_stack) from [<7f000070>] (my_brd_ioctl+0x2c/0x40 [my_brd])
+[  966.848339] [<7f000070>] (my_brd_ioctl [my_brd]) from [<802afafc>] (blkdev_ioctl+0x1a0/0x8f4)
+[  966.856878] [<802afafc>] (blkdev_ioctl) from [<80126a38>] (do_vfs_ioctl+0x3f4/0x5b8)
+[  966.864616] [<80126a38>] (do_vfs_ioctl) from [<80126c30>] (SyS_ioctl+0x34/0x5c)
+[  966.871929] [<80126c30>] (SyS_ioctl) from [<8000e560>] (ret_fast_syscall+0x0/0x30)
+[  966.879502] ============================================
+[  966.879502]
+[  966.879502]

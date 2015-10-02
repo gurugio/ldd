@@ -1,0 +1,63 @@
+# mount -t ext4 /dev/my_brd mnt
+[ 1155.591780] brd_probe start
+[ 1155.594572] brd_probe ends
+[ 1155.597332] brd_probe start
+[ 1155.600154] brd_probe ends
+[ 1155.602915] bio-info:sector=2 size=1024 capa=65536 rw=0
+[ 1155.608165] bvec:sector=2 page-fde6 disk-page-4920b len=1024 offset=400 rw=READ
+[ 1155.615516] bio-info:sector=4 size=1024 capa=65536 rw=0
+[ 1155.620734] bvec:sector=4 page-fde6 disk-page-4920b len=1024 offset=800 rw=READ
+[ 1155.628091] bio-info:sector=326 size=1024 capa=65536 rw=0
+[ 1155.633483] bvec:sector=326 page-fde7 disk-page-4927e len=1024 offset=c00 rw=READ
+[ 1155.640973] bio-info:sector=324 size=1024 capa=65536 rw=0
+[ 1155.646376] bvec:sector=324 page-fde7 disk-page-4927e len=1024 offset=800 rw=READ
+[ 1155.653889] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[ 1155.659465] bvec:sector=32770 page-fde8 disk-page-48234 len=1024 offset=400 rw=READ
+[ 1155.667307] bio-info:sector=2 size=1024 capa=65536 rw=0
+[ 1155.672526] bvec:sector=2 page-fde6 disk-page-4920b len=1024 offset=400 rw=WRITE
+[ 1155.680017] EXT4-fs (my_brd0): mounted filesystem with ordered data mode. Opts: (null)
+# cd mnt
+# cat [ 1160.946993] bio-info:sector=268 size=1024 capa=65536 rw=0
+[ 1160.952388] bvec:sector=268 page-fd99 disk-page-491f9 len=1024 offset=800 rw=READ
+# cat aaa
+[ 1163.780963] bio-info:sector=17410 size=1024 capa=65536 rw=0
+[ 1163.786582] bvec:sector=17410 page-fdfd disk-page-48ab4 len=1024 offset=0 rw=READ
+abcd
+# cd [ 1166.175509] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[ 1166.181094] bvec:sector=32770 page-fde8 disk-page-48234 len=1024 offset=400 rw=WRITE
+[ 1166.188907] bio-info:sector=32772 size=1024 capa=65536 rw=0
+[ 1166.194475] bvec:sector=32772 page-fde8 disk-page-48234 len=1024 offset=800 rw=WRITE
+[ 1166.202224] bio-info:sector=32774 size=1024 capa=65536 rw=0
+[ 1166.207800] bvec:sector=32774 page-fde7 disk-page-48234 len=1024 offset=800 rw=WRITE
+[ 1166.215546] bio-info:sector=32776 size=1024 capa=65536 rw=0
+[ 1166.221109] bvec:sector=32776 page-fde6 disk-page-48235 len=1024 offset=400 rw=WRITE
+[ 1166.228875] bio-info:sector=32778 size=1024 capa=65536 rw=0
+[ 1166.234439] bvec:sector=32778 page-fde0 disk-page-48235 len=1024 offset=400 rw=WRITE
+..
+# umount mnt
+[ 1169.005589] bio-info:sector=2 size=1024 capa=65536 rw=0
+[ 1169.010811] bvec:sector=2 page-fde6 disk-page-4920b len=1024 offset=400 rw=WRITE
+[ 1169.018282] bio-info:sector=324 size=1024 capa=65536 rw=0
+[ 1169.023675] bvec:sector=324 page-fde7 disk-page-4927e len=1024 offset=800 rw=WRITE
+[ 1169.031423] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[ 1169.037003] bvec:sector=32770 page-fde8 disk-page-48234 len=1024 offset=400 rw=WRITE
+[ 1169.044742] bio-info:sector=32770 size=1024 capa=65536 rw=0
+[ 1169.050318] bvec:sector=32770 page-fde8 disk-page-48234 len=1024 offset=400 rw=WRITE
+[ 1169.058104] bio-info:sector=2 size=1024 capa=65536 rw=0
+[ 1169.063321] bvec:sector=2 page-fde6 disk-page-4920b len=1024 offset=400 rw=WRITE
+[ 1169.070887] brd_probe start
+[ 1169.073673] brd_probe ends
+[ 1169.076381] my_brd_ioctl:52
+[ 1169.079270] ============================================
+[ 1169.084578] CPU: 1 PID: 812 Comm: umount Tainted: G           O  3.16.7+ #53
+[ 1169.091646] [<80014ec4>] (unwind_backtrace) from [<80011eb4>] (show_stack+0x10/0x14)
+[ 1169.099400] [<80011eb4>] (show_stack) from [<805cf094>] (dump_stack+0x80/0xc0)
+[ 1169.106619] [<805cf094>] (dump_stack) from [<7f000070>] (my_brd_ioctl+0x2c/0x40 [my_brd])
+[ 1169.114809] [<7f000070>] (my_brd_ioctl [my_brd]) from [<802afafc>] (blkdev_ioctl+0x1a0/0x8f4)
+[ 1169.123340] [<802afafc>] (blkdev_ioctl) from [<80126a38>] (do_vfs_ioctl+0x3f4/0x5b8)
+[ 1169.131090] [<80126a38>] (do_vfs_ioctl) from [<80126c30>] (SyS_ioctl+0x34/0x5c)
+[ 1169.138405] [<80126c30>] (SyS_ioctl) from [<8000e560>] (ret_fast_syscall+0x0/0x30)
+[ 1169.145975] ============================================
+[ 1169.145975]
+[ 1169.145975]
+#

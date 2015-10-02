@@ -95,6 +95,47 @@ static struct page *brd_sector_to_page(int sector_num)
 	return disk_image[sector_num >> PAGE_SECTORS_SHIFT];
 }
 
+static void brd_transfer_data(struct bio_vec *bvec, sector_t sector, int rw)
+{
+	void *mem_ptr;
+	void *disk_ptr;
+	unsigned int offset = (sector & (PAGE_SECTORS - 1)) << SECTOR_SHIFT;
+	size_t len = bvec->bv_len;
+	size_t copy_once;
+
+	printk(KERN_EMERG "bvec:sector=0x%x page-0x%x disk-page-0x%x len=%d offset=0x%x rw=%s\n",
+	       (int)sector,
+	       (int)page_to_pfn(bvec->bv_page),
+	       (int)page_to_pfn(brd_sector_to_page(sector)),
+	       bvec->bv_len,
+	       bvec->bv_offset,
+	       rw == READ ? "READ":"WRITE");
+
+	mem_ptr = kmap_atomic(bvec->bv_page);
+	disk_ptr = kmap_atomic(brd_sector_to_page(sector));
+
+	/* go across page boundary */
+	copy_once = min_t(size_t, len, PAGE_SIZE - offset);
+	
+	if (rw == READ) {
+		memcpy(mem_ptr + bvec->bv_offset, disk_ptr + offset, copy_once);
+	} else {
+		memcpy(disk_ptr + offset, mem_ptr + bvec->bv_offset, copy_once);
+	}
+
+	if (copy_once < len) {
+		len -= copy_once;
+		if (rw == READ) {
+			memcpy(mem_ptr + bvec->bv_offset, disk_ptr + offset, len);
+		} else {
+			memcpy(disk_ptr + offset, mem_ptr + bvec->bv_offset, len);
+		}
+	}
+	
+	kunmap_atomic(disk_ptr);
+	kunmap_atomic(mem_ptr);
+}
+
 static void brd_make_request(struct request_queue *q, struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
@@ -105,41 +146,12 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 	struct bvec_iter iter;
 	int err = -EIO;
 
-	/* brd_make_request() is called 3-times before my_brd_init completes.
-	 * Where? Why? Why 3-times?
-	 * ARM-board: add_disk() calls blkdev_get()->rescan_partition()->...
-	 [  299.736026] CPU: 0 PID: 806 Comm: insmod Tainted: G        W  O  3.16.7+ #53
-	 [  299.743084] [<80014ec4>] (unwind_backtrace) from [<80011eb4>] (show_stack+0x10/0x14)
-	 [  299.750840] [<80011eb4>] (show_stack) from [<805cf094>] (dump_stack+0x80/0xc0)
-	 [  299.758072] [<805cf094>] (dump_stack) from [<7f0080f0>] (brd_make_request+0x2c/0x80 [my_brd])
-	 [  299.766606] [<7f0080f0>] (brd_make_request [my_brd]) from [<802a30f8>] (generic_make_request+0xa8/0xd4)
-	 [  299.776014] [<802a30f8>] (generic_make_request) from [<802a31a8>] (submit_bio+0x84/0x168)
-	 [  299.784186] [<802a31a8>] (submit_bio) from [<801443ac>] (_submit_bh+0x1a4/0x24c)
-	 [  299.791623] [<801443ac>] (_submit_bh) from [<80145b38>] (block_read_full_page+0x274/0x328)
-	 [  299.799894] [<80145b38>] (block_read_full_page) from [<800c5a34>] (do_read_cache_page+0x84/0x198)
-	 [  299.808772] [<800c5a34>] (do_read_cache_page) from [<800c5b60>] (read_cache_page+0x18/0x20)
-	 [  299.817129] [<800c5b60>] (read_cache_page) from [<802b3724>] (read_dev_sector+0x28/0x6c)
-	 [  299.825215] [<802b3724>] (read_dev_sector) from [<802b5068>] (read_lba+0xbc/0x160)
-	 [  299.832785] [<802b5068>] (read_lba) from [<802b542c>] (efi_partition+0xc8/0x8b8)
-	 [  299.840186] [<802b542c>] (efi_partition) from [<802b45a8>] (check_partition+0x140/0x1fc)
-	 [  299.848277] [<802b45a8>] (check_partition) from [<802b3c80>] (rescan_partitions+0x9c/0x2bc)
-	 [  299.856632] [<802b3c80>] (rescan_partitions) from [<80147ec4>] (__blkdev_get+0x2bc/0x3dc)
-	 [  299.864803] [<80147ec4>] (__blkdev_get) from [<80148188>] (blkdev_get+0x1a4/0x31c)
-	 [  299.872373] [<80148188>] (blkdev_get) from [<802b1a58>] (add_disk+0x330/0x42c)
-	 [  299.879602] [<802b1a58>] (add_disk) from [<7f00a14c>] (my_brd_init+0x14c/0x1c4 [my_brd])
-	 [  299.887695] [<7f00a14c>] (my_brd_init [my_brd]) from [<80008b84>] (do_one_initcall+0x8c/0x1c4)
-	 [  299.896311] [<80008b84>] (do_one_initcall) from [<800914cc>] (load_module+0x1b28/0x1f6c)
-	 [  299.904394] [<800914cc>] (load_module) from [<800919ec>] (SyS_init_module+0xdc/0xf0)
-	 [  299.912138] [<800919ec>] (SyS_init_module) from [<8000e560>] (ret_fast_syscall+0x0/0x30)
-	 [  299.920244] ============================================
-	 [  299.928516] sector=0 size=4096 capa=32768 rw=0
-	 */
 	/* printk(KERN_EMERG "brd_make_request: do nothing but bio_end()\n"); */
 	/* printk(KERN_EMERG "============================================\n"); */
 	/* dump_stack(); */
 	/* printk(KERN_EMERG "============================================\n"); */
 
-	printk(KERN_EMERG "bio-info:sector=%d size=%d capa=%d rw=%d\n",
+	printk(KERN_EMERG "bio-info:sector=0x%x size=%d capa=%d rw=%d\n",
 	       (int)bio->bi_iter.bi_sector,
 	       (int)bio->bi_iter.bi_size,
 	       (int)get_capacity(my_brd_disk),
@@ -148,9 +160,6 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 
 	sector = bio->bi_iter.bi_sector;
 
-	/* printk(KERN_EMERG "end_sector=%d capa=%d\n", */
-	/*        (int)bio_end_sector(bio), */
-	/*        (int)get_capacity(bdev->bd_disk)); */
 	if (bio_end_sector(bio) > get_capacity(bdev->bd_disk)) {
 		printk(KERN_EMERG "sector overflow\n");
 		goto out;
@@ -179,35 +188,9 @@ static void brd_make_request(struct request_queue *q, struct bio *bio)
 		rw = READ;
 
 	bio_for_each_segment(bvec, bio, iter) {
-		void *mem;
-		void *disk_ptr;
 		unsigned int len = bvec.bv_len;
-		unsigned int offset = sector & (PAGE_SECTORS - 1) << SECTOR_SHIFT;
 
-		printk(KERN_EMERG "bvec:sector=%d page-%x disk-page-%x len=%d offset=%x rw=%s\n",
-		       (int)sector,
-		       (int)page_to_pfn(bvec.bv_page),
-		       (int)page_to_pfn(brd_sector_to_page(sector)),
-		       bvec.bv_len, bvec.bv_offset,
-		       rw == READ ? "READ":"WRITE");
-
-
-		/*
-		 * BUGBUG: len can be bigger than PAGE_SIZE.
-		 * It should check next page should be referenced.
-		 *
-		 * And is (disk_ptr + offset) correct?
-		 */
-		
-		mem = kmap_atomic(bvec.bv_page);
-		disk_ptr = kmap_atomic(brd_sector_to_page(sector));
-		if (rw == READ) {
-			memcpy(mem + bvec.bv_offset, disk_ptr + offset, len);
-		} else {
-			memcpy(disk_ptr + offset, mem + bvec.bv_offset, len);
-		}
-		kunmap_atomic(disk_ptr);
-		kunmap_atomic(mem);
+		brd_transfer_data(&bvec, sector, rw);
 		sector += len >> SECTOR_SHIFT;
 	}
 
