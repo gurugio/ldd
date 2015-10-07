@@ -56,31 +56,40 @@ static int my_brd_ioctl(struct block_device *bdev, fmode_t mode,
 	return 0;
 }
 
+static struct page *brd_sector_to_page(int sector_num)
+{
+	return disk_image[sector_num >> PAGE_SECTORS_SHIFT];
+}
+
 #ifdef CONFIG_BLK_DEV_RAM_DAX
 static long my_brd_direct_access(struct block_device *bdev, sector_t sector,
 			void **kaddr, unsigned long *pfn, long size)
 {
 	/* struct brd_device *brd = bdev->bd_disk->private_data; */
-	/* struct page *page; */
+	struct page *page;
 
+	printk(KERN_EMERG "dax:sector=%d size=%d\n",
+	       (int)sector, (int)size);
 	/* if (!brd) */
 	/* 	return -ENODEV; */
 	/* page = brd_insert_page(brd, sector); */
-	/* if (!page) */
-	/* 	return -ENOSPC; */
-	/* *kaddr = page_address(page); */
-	/* *pfn = page_to_pfn(page); */
+	page = brd_sector_to_page(sector);
+	if (!page)
+		return -ENOSPC;
+	*kaddr = page_address(page);
+	*pfn = page_to_pfn(page);
 
-	/* /\* */
-	/*  * TODO: If size > PAGE_SIZE, we could look to see if the next page in */
-	/*  * the file happens to be mapped to the next page of physical RAM. */
-	/*  *\/ */
+	printk(KERN_EMERG "dax:kaddr=0x%lx pfn=%x\n",
+	       *kaddr, (int)*pfn);
+	/*
+	 * TODO: If size > PAGE_SIZE, we could look to see if the next page in
+	 * the file happens to be mapped to the next page of physical RAM.
+	 */
 	return PAGE_SIZE;
 }
 #else
 #define my_brd_direct_access NULL
 #endif
-
 
 static const struct block_device_operations my_brd_fops = {
 	.owner =		THIS_MODULE,
@@ -89,11 +98,6 @@ static const struct block_device_operations my_brd_fops = {
 	.direct_access =	my_brd_direct_access,
 };
 
-
-static struct page *brd_sector_to_page(int sector_num)
-{
-	return disk_image[sector_num >> PAGE_SECTORS_SHIFT];
-}
 
 static void brd_transfer_data(struct bio_vec *bvec, sector_t sector, int rw)
 {
@@ -217,7 +221,7 @@ static int __init my_brd_init(void)
 
 	printk(KERN_EMERG "allocate %d-pages\n", DISK_PAGES);
 	for (i = 0; i < DISK_PAGES; i++)
-		disk_image[i] = alloc_page(GFP_KERNEL);
+		disk_image[i] = alloc_page(GFP_KERNEL | GFP_NOIO);
 	
 
 	printk(KERN_EMERG "start my_brd_init\n");
